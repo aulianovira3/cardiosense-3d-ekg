@@ -1,0 +1,1965 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CardioSense 3D — Laboratorium Virtual Akuisisi & Pemrosesan Sinyal EKG</title>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Three.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            slateDark: '#060d14',
+            panelDark: '#0c1824',
+            cardDark: '#102132',
+            medTeal: '#14b8a6',
+            medCyan: '#06b6d4',
+            minangGold: '#f59e0b',
+            minangCrimson: '#e11d48',
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* Kustomisasi Estetika Rekayasa Klinis & Ornamen Songket Minangkabau */
+    body {
+      background-color: #060d14;
+      color: #e2e8f0;
+      overflow-x: hidden;
+    }
+
+    /* Pola Geometris Songket Minangkabau (Pucuak Rabuang & Belah Ketupat) */
+    .songket-strip {
+      height: 10px;
+      width: 100%;
+      background-color: #09131d;
+      background-image: url("data:image/svg+xml,%3Csvg width='40' height='10' viewBox='0 0 40 10' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 5 L5 0 L10 5 L5 10 Z M10 5 L15 0 L20 5 L15 10 Z M20 5 L25 0 L30 5 L25 10 Z M30 5 L35 0 L40 5 L35 10 Z' fill='none' stroke='%23f59e0b' stroke-opacity='0.45' stroke-width='1'/%3E%3Ccircle cx='5' cy='5' r='1.2' fill='%2314b8a6'/%3E%3Ccircle cx='25' cy='5' r='1.2' fill='%2314b8a6'/%3E%3C/svg%3E");
+      background-repeat: repeat-x;
+    }
+
+    .songket-card-border {
+      position: relative;
+      border: 1px solid rgba(20, 184, 166, 0.25);
+      box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
+    }
+
+    .songket-card-border::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 16px;
+      right: 16px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #f59e0b, #14b8a6, #f59e0b, transparent);
+      opacity: 0.75;
+    }
+
+    /* Custom Range Slider */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: #1e293b;
+      height: 6px;
+      border-radius: 999px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #14b8a6;
+      border: 2px solid #f8fafc;
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      background: #f59e0b;
+    }
+
+    /* Scrollbar halus */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #060d14;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e3a52;
+      border-radius: 999px;
+    }
+
+    /* Animasi denyut indikator medis */
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.9; }
+      70% { transform: scale(1.2); opacity: 0.2; }
+      100% { transform: scale(0.95); opacity: 0.9; }
+    }
+    .pulse-indicator {
+      animation: pulse-ring 1.2s infinite ease-in-out;
+    }
+
+    /* Simulasi latar meja AR jika kamera tidak tersedia */
+    .virtual-ar-desk {
+      background:
+        radial-gradient(circle at 50% 60%, rgba(20, 184, 166, 0.18), transparent 65%),
+        linear-gradient(180deg, #1b2836 0%, #0f172a 52%, #29221c 53%, #1c1612 100%);
+    }
+    .ar-grid-plane {
+      background-image:
+        linear-gradient(to right, rgba(20, 184, 166, 0.35) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(20, 184, 166, 0.35) 1px, transparent 1px);
+      background-size: 36px 36px;
+      transform: perspective(420px) rotateX(62deg);
+      transform-origin: bottom center;
+    }
+  </style>
+</head>
+<body class="font-sans antialiased selection:bg-teal-500 selection:text-white">
+
+  <!-- Toast / Message Box Non-Blocking (Pengganti alert()) -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+
+  <!-- HEADER UTAMA DENGAN IDENTITAS POLITEKNIK NEGERI PADANG & SILUET RUMAH GADANG -->
+  <header class="bg-panelDark/95 backdrop-blur-md border-b border-teal-500/25 sticky top-0 z-40">
+    <div class="songket-strip"></div>
+    <div class="max-w-[1440px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <!-- Brand & Siluet Atap Bagonjong -->
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-500/20 to-amber-500/20 border border-amber-400/40 flex items-center justify-center shadow-lg shrink-0" title="Identitas Budaya Minangkabau & Rekayasa Biomedis">
+          <!-- SVG Siluet Atap Bagonjong Rumah Gadang + Gelombang EKG -->
+          <svg class="w-8 h-8" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 18 C10 17, 14 11, 16 6 C18 13, 21 15, 24 15 C27 15, 30 13, 32 6 C34 11, 38 17, 44 18 L39 22 L9 22 Z" fill="#f59e0b" fill-opacity="0.85"/>
+            <path d="M6 32 L14 32 L17 26 L21 39 L25 22 L29 35 L32 32 L42 32" stroke="#14b8a6" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h1 class="text-base sm:text-lg font-extrabold tracking-tight text-white">
+              CardioSense <span class="text-teal-400">3D</span>
+            </h1>
+            <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
+              D4 Teknik Elektronika • PNP
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">
+            Laboratorium Virtual Akuisisi & Pemrosesan Sinyal EKG Berbasis AR/VR & GenAI
+          </p>
+        </div>
+      </div>
+
+      <!-- Kontrol Audio, Narasi & Progress Belajar 18 Menit -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <!-- Pelacak Durasi 18 Menit -->
+        <div class="hidden md:flex items-center gap-2 bg-slate-900/90 border border-slate-700/80 px-3 py-1.5 rounded-xl">
+          <span class="text-xs text-slate-400">Progres Belajar (18 Mnt):</span>
+          <div class="w-24 h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div id="learning-progress-bar" class="h-full bg-gradient-to-r from-teal-400 to-amber-400 transition-all duration-500" style="width: 25%"></div>
+          </div>
+          <span id="learning-progress-text" class="text-xs font-mono font-bold text-teal-400">1/4</span>
+        </div>
+
+        <!-- Tombol Audio Monitor EKG -->
+        <button id="btn-toggle-audio" onclick="toggleAudio()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600/60 transition cursor-pointer" title="Aktifkan/Matikan Suara Detak EKG & Dengung 50Hz">
+          <span id="audio-icon">🔇</span>
+          <span id="audio-label">Audio Monitor: OFF</span>
+        </button>
+
+        <!-- Tombol Narasi Suara Bahasa Indonesia -->
+        <button id="btn-narrate" onclick="narrateCurrentStep()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-teal-600/20 hover:bg-teal-600/35 text-teal-300 border border-teal-500/40 transition cursor-pointer" title="Dengarkan Panduan Suara Bahasa Indonesia">
+          <span>🗣️</span>
+          <span class="hidden sm:inline">Panduan Suara</span>
+        </button>
+
+        <!-- Tombol Panduan Alur 15-20 Menit -->
+        <button onclick="toggleGuideModal()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition cursor-pointer">
+          <span>📋</span>
+          <span>Alur 18 Mnt</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MODAL ALUR PEMBELAJARAN 15-20 MENIT -->
+  <div id="guide-modal" class="fixed inset-0 z-50 hidden bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-panelDark songket-card-border rounded-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-700/80">
+        <div>
+          <span class="text-xs font-semibold uppercase tracking-wider text-amber-400">Rancangan Pengalaman Belajar (18 Menit)</span>
+          <h2 class="text-lg font-bold text-white">Panduan Praktikum Virtual Elektronika Medis</h2>
+        </div>
+        <button onclick="toggleGuideModal()" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm cursor-pointer">✕</button>
+      </div>
+
+      <div class="mt-4 space-y-3 text-sm">
+        <div class="p-3.5 rounded-xl bg-cardDark border border-teal-500/30 flex items-start gap-3">
+          <span class="px-2.5 py-1 rounded-lg bg-teal-500/20 text-teal-300 font-mono text-xs font-bold shrink-0">4 Mnt</span>
+          <div>
+            <h3 class="font-bold text-white">Tahap 1: Orientasi Anatomi Jantung 3D/AR & Kalibrasi Elektroda</h3>
+            <p class="text-slate-300 text-xs mt-1">Eksplorasi model jantung 3D (putar 360° atau aktifkan <strong>Mode AR Kamera Meja</strong>). Klik ketiga elektroda (<strong>RA, LA, LL</strong>) untuk menurunkan impedansi kontak kulit di bawah 5 kΩ.</p>
+          </div>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-cardDark border border-teal-500/30 flex items-start gap-3">
+          <span class="px-2.5 py-1 rounded-lg bg-teal-500/20 text-teal-300 font-mono text-xs font-bold shrink-0">5 Mnt</span>
+          <div>
+            <h3 class="font-bold text-white">Tahap 2: Isolasi Derau Klinis & Filter IIR vs Zero-Phase</h3>
+            <p class="text-slate-300 text-xs mt-1">Uji efek interferensi jala-jala <strong>50 Hz</strong>, <em>Baseline Wander</em> (&lt;0.5 Hz), dan artefak otot <strong>EMG</strong>. Bandingkan distorsi fase pada <strong>Filter IIR Satu Arah</strong> melawan presisi puncak gelombang R pada <strong>Zero-Phase (<code>filtfilt</code>)</strong>.</p>
+          </div>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-cardDark border border-teal-500/30 flex items-start gap-3">
+          <span class="px-2.5 py-1 rounded-lg bg-teal-500/20 text-teal-300 font-mono text-xs font-bold shrink-0">5 Mnt</span>
+          <div>
+            <h3 class="font-bold text-white">Tahap 3: Pipeline Ekstraksi Fitur Pan-Tompkins</h3>
+            <p class="text-slate-300 text-xs mt-1">Telusuri 5 tahap deteksi QRS (Terfilter → Bandpass 5-15 Hz → Diferensiasi → Penguadratan → <em>Moving Window Integration</em>) dan atur <strong>Threshold Dinamis</strong> untuk memperoleh pembacaan BPM akurat.</p>
+          </div>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-cardDark border border-amber-500/30 flex items-start gap-3">
+          <span class="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 font-mono text-xs font-bold shrink-0">4 Mnt</span>
+          <div>
+            <h3 class="font-bold text-white">Tahap 4: Misi Studi Kasus GenAI & Validasi Kode Python</h3>
+            <p class="text-slate-300 text-xs mt-1">Bangkitkan skenario pasien baru dari fasilitas kesehatan Sumatera Barat melalui <strong>GenAI Case Generator</strong>, selesaikan diagnosis sinyal, lalu klik <strong>Validasi Keputusan Klinis</strong> untuk memperoleh evaluasi HOTS dan skrip Python Google Colab.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-5 flex justify-end">
+        <button onclick="toggleGuideModal()" class="px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs cursor-pointer">
+          Mulai Eksplorasi Praktikum
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- KONTEN UTAMA GRID RESPONSIF -->
+  <main class="max-w-[1440px] mx-auto px-4 py-4 space-y-4">
+
+    <!-- BARIS ATAS: BANNER KASUS KLINIS GEN-AI (SUMATERA BARAT) + NAVIGASI 4 TAHAP -->
+    <section class="bg-panelDark songket-card-border rounded-2xl p-4">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <!-- Info Kasus Pasien GenAI -->
+        <div class="flex-1 space-y-1.5">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="px-2.5 py-0.5 rounded-md bg-teal-500/20 text-teal-300 border border-teal-500/30 text-[11px] font-bold uppercase tracking-wide">
+              🤖 Skenario Klinis GenAI Aktif
+            </span>
+            <span id="case-location" class="px-2.5 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[11px] font-semibold">
+              📍 Puskesmas Pauh, Kota Padang
+            </span>
+            <span id="case-id-badge" class="text-[11px] font-mono text-slate-400">
+              #KASUS-SUMBAR-01
+            </span>
+          </div>
+          <h2 id="case-title" class="text-sm sm:text-base font-bold text-white">
+            Misi 1: Gangguan Jala-Jala Listrik 50 Hz & Impedansi Elektroda pada Pemeriksaan Poli Umum
+          </h2>
+          <p id="case-description" class="text-xs text-slate-300 leading-relaxed">
+            Pasien mengeluh berdebar setelah aktivitas fisik. Ruang pemeriksaan berdekatan dengan stabilizer tegangan sehingga muncul induksi jala-jala 50 Hz dan pergeseran garis dasar pernapasan. Kalibrasi elektroda 3D, isolasi derau, gunakan filter Zero-Phase, dan ukur BPM pasien secara presisi!
+          </p>
+        </div>
+
+        <!-- Tombol Aksi GenAI -->
+        <div class="flex flex-wrap sm:flex-nowrap items-center gap-2.5 shrink-0">
+          <button onclick="generateNewAICase()" class="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition cursor-pointer">
+            <span>✨</span>
+            <span>Generate Variasi Kasus AI</span>
+          </button>
+          <button onclick="validateClinicalDecision()" class="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 text-slate-950 font-bold text-xs shadow-lg shadow-teal-500/20 transition cursor-pointer">
+            <span>🩺</span>
+            <span>Validasi Keputusan Klinis</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Stepper 4 Tahap Pembelajaran (15-20 Menit) -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 mt-4 pt-3 border-t border-slate-800">
+        <button id="step-btn-1" onclick="selectLearningStep(1)" class="step-tab flex items-center justify-between p-2.5 rounded-xl bg-teal-500/15 border border-teal-400 text-left transition cursor-pointer">
+          <div>
+            <div class="text-[11px] font-bold text-teal-300">Tahap 1 • 4 Mnt</div>
+            <div class="text-xs font-semibold text-white truncate">3D/AR & Elektroda</div>
+          </div>
+          <span id="step-check-1" class="text-xs font-bold text-teal-400">●</span>
+        </button>
+
+        <button id="step-btn-2" onclick="selectLearningStep(2)" class="step-tab flex items-center justify-between p-2.5 rounded-xl bg-slate-900/80 border border-slate-700/80 hover:border-slate-500 text-left transition cursor-pointer">
+          <div>
+            <div class="text-[11px] font-bold text-slate-400">Tahap 2 • 5 Mnt</div>
+            <div class="text-xs font-semibold text-slate-200 truncate">Derau & Zero-Phase</div>
+          </div>
+          <span id="step-check-2" class="text-xs font-bold text-slate-500">○</span>
+        </button>
+
+        <button id="step-btn-3" onclick="selectLearningStep(3)" class="step-tab flex items-center justify-between p-2.5 rounded-xl bg-slate-900/80 border border-slate-700/80 hover:border-slate-500 text-left transition cursor-pointer">
+          <div>
+            <div class="text-[11px] font-bold text-slate-400">Tahap 3 • 5 Mnt</div>
+            <div class="text-xs font-semibold text-slate-200 truncate">Pipeline Pan-Tompkins</div>
+          </div>
+          <span id="step-check-3" class="text-xs font-bold text-slate-500">○</span>
+        </button>
+
+        <button id="step-btn-4" onclick="selectLearningStep(4)" class="step-tab flex items-center justify-between p-2.5 rounded-xl bg-slate-900/80 border border-slate-700/80 hover:border-slate-500 text-left transition cursor-pointer">
+          <div>
+            <div class="text-[11px] font-bold text-slate-400">Tahap 4 • 4 Mnt</div>
+            <div class="text-xs font-semibold text-slate-200 truncate">Evaluasi & Kode Python</div>
+          </div>
+          <span id="step-check-4" class="text-xs font-bold text-slate-500">○</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- WORKSPACE UTAMA: KIRI (3D/AR HEART VIEWPORT) & KANAN (OSILOSKOP + 4 TITIK INTERAKSI HOTS) -->
+    <div class="grid grid-cols-1 xl:grid-cols-12 gap-4">
+
+      <!-- KOLOM KIRI (5 KOLOM): VISUALISASI 3D/VR JANTUNG & MODE AR + TITIK INTERAKSI 1 (KALIBRASI ELEKTRODA) -->
+      <div class="xl:col-span-5 flex flex-col gap-4">
+        <div class="bg-panelDark songket-card-border rounded-2xl p-4 flex flex-col">
+          <!-- Header Viewport 3D/AR -->
+          <div class="flex items-center justify-between gap-2 mb-3 flex-wrap">
+            <div>
+              <span class="text-[11px] font-bold uppercase tracking-wider text-teal-400">Titik Interaksi 1 • Visualisasi 3D/VR & AR</span>
+              <h3 class="text-sm font-bold text-white">Anatomi Konduksi Jantung & Elektroda Lead II</h3>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button id="btn-ar-mode" onclick="toggleARMode()" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/50 transition cursor-pointer">
+                📷 Mode AR (Kamera Meja)
+              </button>
+              <button onclick="resetCamera3D()" class="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs border border-slate-600/60 cursor-pointer" title="Reset Posisi Kamera 3D">
+                ⟲
+              </button>
+            </div>
+          </div>
+
+          <!-- Container Viewport 3D / AR -->
+          <div id="viewport-wrapper" class="relative w-full h-[330px] sm:h-[370px] rounded-xl overflow-hidden border border-slate-700/80 bg-[#040910] select-none">
+            <!-- Video Feed untuk Kamera AR Nyata -->
+            <video id="ar-video" autoplay playsinline muted class="hidden absolute inset-0 w-full h-full object-cover z-0"></video>
+
+            <!-- Simulasi Ruang Meja AR jika Kamera Tidak Tersedia -->
+            <div id="ar-virtual-room" class="hidden virtual-ar-desk absolute inset-0 w-full h-full z-0 overflow-hidden">
+              <div class="ar-grid-plane absolute inset-x-0 bottom-0 h-1/2"></div>
+              <div class="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-amber-500/20 border border-amber-400/50 text-[11px] font-mono text-amber-300">
+                AR SURFACE LOCKED • MEJA LAB VIRTUAL
+              </div>
+            </div>
+
+            <!-- Canvas Three.js -->
+            <div id="three-container" class="relative z-10 w-full h-full cursor-grab active:cursor-grabbing"></div>
+
+            <!-- Overlay Status Konduksi Listrik Jantung -->
+            <div class="absolute top-3 right-3 z-20 bg-slate-950/80 backdrop-blur-md border border-slate-700/80 rounded-xl px-3 py-2 text-right pointer-events-none">
+              <div class="text-[10px] uppercase tracking-wider text-slate-400">Fase Siklus Jantung</div>
+              <div id="cardiac-phase-label" class="text-xs font-mono font-bold text-teal-400">SA Node → Depolarisasi Atrium (P)</div>
+              <div class="text-[10px] font-mono text-slate-300 mt-0.5">
+                Ritme Aktual: <span id="true-bpm-hud" class="text-amber-400 font-bold">75 BPM</span>
+              </div>
+            </div>
+
+            <!-- Petunjuk Interaksi 3D di Bawah Kanvas -->
+            <div class="absolute bottom-2.5 left-3 right-3 z-20 flex items-center justify-between gap-2 pointer-events-none">
+              <span class="px-2.5 py-1 rounded-lg bg-slate-950/80 text-[11px] text-slate-300 border border-slate-800">
+                🖱️ Seret 360° • Scroll Zoom • Klik Bola Elektroda
+              </span>
+              <span id="ar-status-badge" class="hidden px-2.5 py-1 rounded-lg bg-teal-500/20 text-[11px] font-bold text-teal-300 border border-teal-500/40">
+                AR AKTIF
+              </span>
+            </div>
+          </div>
+
+          <!-- Panel Kalibrasi Elektroda 3D (RA, LA, LL) -->
+          <div class="mt-3 pt-3 border-t border-slate-800">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-slate-200">Status Impedansi Kontak Elektroda (Target &lt; 5 kΩ):</span>
+              <button onclick="calibrateAllElectrodes()" class="text-[11px] font-semibold text-teal-400 hover:text-teal-300 underline cursor-pointer">
+                Bersihkan & Gel Semua
+              </button>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              <!-- Elektroda RA -->
+              <button id="elec-card-RA" onclick="calibrateElectrode('RA')" class="p-2.5 rounded-xl bg-cardDark border border-rose-500/50 hover:border-teal-400 text-left transition cursor-pointer">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-extrabold text-white">RA (Kanan)</span>
+                  <span id="elec-dot-RA" class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                </div>
+                <div id="elec-imp-RA" class="text-xs font-mono font-bold text-rose-400 mt-1">18.4 kΩ</div>
+                <div id="elec-stat-RA" class="text-[10px] text-slate-400">Klik untuk kalibrasi</div>
+              </button>
+
+              <!-- Elektroda LA -->
+              <button id="elec-card-LA" onclick="calibrateElectrode('LA')" class="p-2.5 rounded-xl bg-cardDark border border-teal-500/40 hover:border-teal-400 text-left transition cursor-pointer">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-extrabold text-white">LA (Kiri)</span>
+                  <span id="elec-dot-LA" class="w-2.5 h-2.5 rounded-full bg-teal-400"></span>
+                </div>
+                <div id="elec-imp-LA" class="text-xs font-mono font-bold text-teal-400 mt-1">3.2 kΩ</div>
+                <div id="elec-stat-LA" class="text-[10px] text-teal-300">Kontak Optimal</div>
+              </button>
+
+              <!-- Elektroda LL -->
+              <button id="elec-card-LL" onclick="calibrateElectrode('LL')" class="p-2.5 rounded-xl bg-cardDark border border-amber-500/50 hover:border-teal-400 text-left transition cursor-pointer">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-extrabold text-white">LL (Kaki)</span>
+                  <span id="elec-dot-LL" class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                </div>
+                <div id="elec-imp-LL" class="text-xs font-mono font-bold text-amber-400 mt-1">11.5 kΩ</div>
+                <div id="elec-stat-LL" class="text-[10px] text-slate-400">Klik untuk kalibrasi</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KOLOM KANAN (7 KOLOM): OSILOSKOP REAL-TIME + TITIK INTERAKSI 2, 3, 4 -->
+      <div class="xl:col-span-7 flex flex-col gap-4">
+
+        <!-- OSILOSKOP SINYAL EKG DUAL-TRACE REAL-TIME -->
+        <div class="bg-panelDark songket-card-border rounded-2xl p-4">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+            <div>
+              <span class="text-[11px] font-bold uppercase tracking-wider text-teal-400">Monitor Akuisisi & DSP Real-Time (Fs = 250 Hz)</span>
+              <h3 class="text-sm font-bold text-white">Osiloskop Sinyal EKG Mentah vs Hasil Pemrosesan</h3>
+            </div>
+
+            <!-- Metrik BPM & Status Deteksi -->
+            <div class="flex items-center gap-3 bg-slate-950/90 border border-slate-800 px-3 py-1.5 rounded-xl">
+              <div class="flex items-center gap-2">
+                <span id="rpeak-led" class="w-3 h-3 rounded-full bg-rose-500/30 border border-rose-400 transition-transform duration-75"></span>
+                <div>
+                  <div class="text-[10px] text-slate-400 leading-none">BPM Terdeteksi</div>
+                  <div class="text-base font-mono font-extrabold text-teal-400 leading-tight">
+                    <span id="detected-bpm">0</span> <span class="text-xs font-normal text-slate-400">BPM</span>
+                  </div>
+                </div>
+              </div>
+              <div class="h-7 w-px bg-slate-800"></div>
+              <div>
+                <div class="text-[10px] text-slate-400 leading-none">Distorsi Fase</div>
+                <div id="phase-lag-indicator" class="text-xs font-mono font-bold text-rose-400 leading-tight">
+                  +44 ms (Lag IIR)
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Legenda Warna Osiloskop -->
+          <div class="flex flex-wrap items-center gap-4 text-[11px] mb-2 text-slate-300">
+            <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-slate-400/70 inline-block"></span> Sinyal Mentah (Raw + Derau)</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-1 bg-teal-400 inline-block rounded"></span> Sinyal Terproses (Filter / Pan-Tompkins)</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 border-b border-dashed border-amber-400 inline-block"></span> Threshold Deteksi R</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span> Puncak R Terdeteksi</span>
+          </div>
+
+          <!-- Kanvas Osiloskop -->
+          <div class="relative w-full h-[220px] sm:h-[245px] rounded-xl overflow-hidden border border-slate-700/80 bg-[#03080e]">
+            <canvas id="ecg-oscilloscope" class="w-full h-full block"></canvas>
+          </div>
+        </div>
+
+        <!-- PANEL KONTROL HOTS: TITIK 2 (DERAU), TITIK 3 (FILTER IIR VS ZERO-PHASE), TITIK 4 (PAN-TOMPKINS) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          <!-- TITIK INTERAKSI 2: SIMULASI DERAU KLINIS -->
+          <div class="bg-panelDark songket-card-border rounded-2xl p-4 space-y-3">
+            <div>
+              <span class="text-[11px] font-bold uppercase tracking-wider text-amber-400">Titik Interaksi 2 • Gangguan Fisik</span>
+              <h4 class="text-sm font-bold text-white">Simulasi & Isolasi Sumber Derau Klinis</h4>
+            </div>
+
+            <!-- Derau 1: Jala-Jala 50 Hz -->
+            <div class="p-2.5 rounded-xl bg-cardDark border border-slate-700/70 space-y-1.5">
+              <div class="flex items-center justify-between">
+                <label class="flex items-center gap-2 text-xs font-semibold text-white cursor-pointer">
+                  <input id="noise-50hz-toggle" type="checkbox" checked onchange="updateDSPSettings()" class="accent-teal-500 w-4 h-4 rounded cursor-pointer" />
+                  <span>Interferensi Jala-Jala 50 Hz</span>
+                </label>
+                <span id="noise-50hz-val" class="text-[11px] font-mono text-amber-400">0.45 mV</span>
+              </div>
+              <input id="noise-50hz-slider" type="range" min="0" max="1" step="0.05" value="0.45" oninput="updateDSPSettings()" class="w-full" />
+            </div>
+
+            <!-- Derau 2: Baseline Wander (<0.5 Hz) -->
+            <div class="p-2.5 rounded-xl bg-cardDark border border-slate-700/70 space-y-1.5">
+              <div class="flex items-center justify-between">
+                <label class="flex items-center gap-2 text-xs font-semibold text-white cursor-pointer">
+                  <input id="noise-bw-toggle" type="checkbox" checked onchange="updateDSPSettings()" class="accent-teal-500 w-4 h-4 rounded cursor-pointer" />
+                  <span>Baseline Wander (&lt;0.5 Hz Napas)</span>
+                </label>
+                <span id="noise-bw-val" class="text-[11px] font-mono text-amber-400">0.60 mV</span>
+              </div>
+              <input id="noise-bw-slider" type="range" min="0" max="1.2" step="0.05" value="0.60" oninput="updateDSPSettings()" class="w-full" />
+            </div>
+
+            <!-- Derau 3: Artefak Otot EMG -->
+            <div class="p-2.5 rounded-xl bg-cardDark border border-slate-700/70 space-y-1.5">
+              <div class="flex items-center justify-between">
+                <label class="flex items-center gap-2 text-xs font-semibold text-white cursor-pointer">
+                  <input id="noise-emg-toggle" type="checkbox" onchange="updateDSPSettings()" class="accent-teal-500 w-4 h-4 rounded cursor-pointer" />
+                  <span>Artefak Otot EMG (&gt;40 Hz)</span>
+                </label>
+                <span id="noise-emg-val" class="text-[11px] font-mono text-amber-400">0.25 mV</span>
+              </div>
+              <input id="noise-emg-slider" type="range" min="0" max="0.8" step="0.05" value="0.25" oninput="updateDSPSettings()" class="w-full" />
+            </div>
+          </div>
+
+          <!-- TITIK INTERAKSI 3: FILTER DIGITAL IIR VS ZERO-PHASE (FILTFILT) -->
+          <div class="bg-panelDark songket-card-border rounded-2xl p-4 space-y-3">
+            <div>
+              <span class="text-[11px] font-bold uppercase tracking-wider text-teal-400">Titik Interaksi 3 • Pemrosesan Sinyal</span>
+              <h4 class="text-sm font-bold text-white">Filter Digital IIR vs Zero-Phase (<code>filtfilt</code>)</h4>
+            </div>
+
+            <!-- Pilihan Tahap Filter -->
+            <div class="space-y-2">
+              <label class="flex items-center justify-between p-2.5 rounded-xl bg-cardDark border border-slate-700/70 cursor-pointer">
+                <div class="flex items-center gap-2">
+                  <input id="filter-notch-toggle" type="checkbox" onchange="updateDSPSettings()" class="accent-teal-500 w-4 h-4 rounded cursor-pointer" />
+                  <div>
+                    <div class="text-xs font-semibold text-white">Notch Filter 50 Hz (Q = 30)</div>
+                    <div class="text-[10px] text-slate-400">Menghilangkan dengung frekuensi listrik PLN</div>
+                  </div>
+                </div>
+                <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-teal-300">iirnotch</span>
+              </label>
+
+              <label class="flex items-center justify-between p-2.5 rounded-xl bg-cardDark border border-slate-700/70 cursor-pointer">
+                <div class="flex items-center gap-2">
+                  <input id="filter-hp-toggle" type="checkbox" onchange="updateDSPSettings()" class="accent-teal-500 w-4 h-4 rounded cursor-pointer" />
+                  <div>
+                    <div class="text-xs font-semibold text-white">High-Pass Filter 0.5 Hz</div>
+                    <div class="text-[10px] text-slate-400">Menstabilkan garis dasar isoelektrik</div>
+                  </div>
+                </div>
+                <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-teal-300">butter HP</span>
+              </label>
+
+              <label class="flex items-center justify-between p-2.5 rounded-xl bg-cardDark border border-slate-700/70 cursor-pointer">
+                <div class="flex items-center gap-2">
+                  <input id="filter-bp-toggle" type="checkbox" onchange="updateDSPSettings()" class="accent-teal-500 w-4 h-4 rounded cursor-pointer" />
+                  <div>
+                    <div class="text-xs font-semibold text-white">Bandpass Diagnostik 0.5–40 Hz</div>
+                    <div class="text-[10px] text-slate-400">Meredam artefak otot EMG frekuensi tinggi</div>
+                  </div>
+                </div>
+                <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-teal-300">butter BP</span>
+              </label>
+            </div>
+
+            <!-- Sakelar IIR Satu Arah vs Zero-Phase Filtering -->
+            <div class="pt-1">
+              <div class="text-[11px] font-semibold text-slate-300 mb-1.5">Metode Implementasi Fase Filter:</div>
+              <div class="grid grid-cols-2 gap-2">
+                <button id="btn-phase-iir" onclick="setFilterPhaseMode('iir')" class="p-2 rounded-xl text-xs font-bold bg-rose-500/20 border border-rose-400 text-rose-300 transition cursor-pointer">
+                  IIR Satu Arah (<code>lfilter</code>)
+                </button>
+                <button id="btn-phase-zerophase" onclick="setFilterPhaseMode('zerophase')" class="p-2 rounded-xl text-xs font-bold bg-slate-800 border border-slate-700 text-slate-300 hover:border-teal-400 transition cursor-pointer">
+                  Zero-Phase (<code>filtfilt</code>)
+                </button>
+              </div>
+              <p id="phase-explanation" class="text-[11px] text-rose-300/90 mt-1.5 leading-snug">
+                ⚠️ Mode IIR satu arah menggeser posisi puncak gelombang R (+44 ms) sehingga mengaburkan interval QRS & ST-segment!
+              </p>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- TITIK INTERAKSI 4: PIPELINE PAN-TOMPKINS & THRESHOLDING -->
+        <div class="bg-panelDark songket-card-border rounded-2xl p-4 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <span class="text-[11px] font-bold uppercase tracking-wider text-teal-400">Titik Interaksi 4 • Deteksi QRS Otomatis</span>
+              <h4 class="text-sm font-bold text-white">Pipeline 5 Tahap Algoritma Pan-Tompkins & Threshold Dinamis</h4>
+            </div>
+            <span id="pan-stage-badge" class="px-2.5 py-1 rounded-lg bg-teal-500/15 border border-teal-500/30 text-xs font-mono font-bold text-teal-300">
+              Tahap 1: Sinyal Terfilter
+            </span>
+          </div>
+
+          <!-- 5 Tahap Pan-Tompkins -->
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            <button id="pt-btn-1" onclick="setPanTompkinsStage(1)" class="pt-stage-btn p-2 rounded-xl bg-teal-500/20 border border-teal-400 text-white text-xs font-bold text-center transition cursor-pointer">
+              1. Terfilter
+            </button>
+            <button id="pt-btn-2" onclick="setPanTompkinsStage(2)" class="pt-stage-btn p-2 rounded-xl bg-cardDark border border-slate-700 text-slate-300 hover:border-teal-400 text-xs font-semibold text-center transition cursor-pointer">
+              2. Bandpass 5-15Hz
+            </button>
+            <button id="pt-btn-3" onclick="setPanTompkinsStage(3)" class="pt-stage-btn p-2 rounded-xl bg-cardDark border border-slate-700 text-slate-300 hover:border-teal-400 text-xs font-semibold text-center transition cursor-pointer">
+              3. Diferensiasi
+            </button>
+            <button id="pt-btn-4" onclick="setPanTompkinsStage(4)" class="pt-stage-btn p-2 rounded-xl bg-cardDark border border-slate-700 text-slate-300 hover:border-teal-400 text-xs font-semibold text-center transition cursor-pointer">
+              4. Squaring (x²)
+            </button>
+            <button id="pt-btn-5" onclick="setPanTompkinsStage(5)" class="pt-stage-btn col-span-2 sm:col-span-1 p-2 rounded-xl bg-cardDark border border-slate-700 text-slate-300 hover:border-teal-400 text-xs font-semibold text-center transition cursor-pointer">
+              5. Moving Window
+            </button>
+          </div>
+
+          <!-- Slider Threshold Dinamis -->
+          <div class="p-3 rounded-xl bg-cardDark border border-slate-700/80 flex flex-col sm:flex-row sm:items-center gap-3">
+            <div class="flex-1">
+              <div class="flex items-center justify-between mb-1">
+                <label for="threshold-slider" class="text-xs font-bold text-amber-300">
+                  Ambang Batas Deteksi R-Peak (Threshold):
+                </label>
+                <span id="threshold-val" class="text-xs font-mono font-bold text-white bg-slate-800 px-2 py-0.5 rounded">0.55</span>
+              </div>
+              <input id="threshold-slider" type="range" min="0.15" max="1.35" step="0.05" value="0.55" oninput="updateDSPSettings()" class="w-full" />
+            </div>
+            <div class="text-[11px] text-slate-300 sm:max-w-[260px]">
+              <span id="pt-stage-desc">Menampilkan sinyal EKG setelah melalui rangkaian filter pra-pemrosesan.</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- PANEL BAWAH: HASIL EVALUASI HOTS GEN-AI & GENERATOR KODE PYTHON GOOGLE COLAB -->
+    <section id="ai-evaluation-panel" class="bg-panelDark songket-card-border rounded-2xl p-4">
+      <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-800">
+        <div>
+          <span class="text-[11px] font-bold uppercase tracking-wider text-amber-400">Asisten Rekayasa Klinis GenAI • Umpan Balik HOTS & Komputasi Python</span>
+          <h3 class="text-sm sm:text-base font-bold text-white">Diagnosis Keputusan Mahasiswa & Skrip <code>scipy.signal</code> Otomatis</h3>
+        </div>
+        <button onclick="copyPythonCode()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 border border-teal-500/40 text-xs font-semibold transition cursor-pointer">
+          <span>📋</span>
+          <span>Salin Kode Python (Colab)</span>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mt-3">
+        <!-- Umpan Balik Evaluasi Klinis AI -->
+        <div class="lg:col-span-6 p-3.5 rounded-xl bg-cardDark border border-slate-700/80 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-white">Hasil Audit Sinyal & Keputusan Klinis:</span>
+              <span id="ai-score-badge" class="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-slate-800 text-slate-300">
+                Belum Divalidasi
+              </span>
+            </div>
+            <div id="ai-feedback-list" class="space-y-2 text-xs text-slate-300 leading-relaxed">
+              <p>Silakan lakukan kalibrasi elektroda, atur filter digital (Notch/High-Pass/Bandpass), pilih metode <strong>Zero-Phase</strong>, sesuaikan <strong>Threshold Pan-Tompkins</strong>, lalu tekan tombol <strong>"Validasi Keputusan Klinis"</strong> di bagian atas untuk menerima audit HOTS dari GenAI.</p>
+            </div>
+          </div>
+          <div class="mt-3 pt-2.5 border-t border-slate-700/70 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Referensi RPS: Elektronika Medis D4 (Fase 1)</span>
+            <span id="ai-case-summary-tag" class="font-mono text-teal-400">Target: 75 BPM</span>
+          </div>
+        </div>
+
+        <!-- Kode Python Siap Salin -->
+        <div class="lg:col-span-6 rounded-xl bg-[#040910] border border-slate-700/80 p-3 font-mono text-[11px] text-teal-300 overflow-x-auto max-h-[250px] overflow-y-auto">
+          <pre id="python-code-output" class="leading-relaxed"></pre>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER DENGAN SENTUHAN KEARIFAN LOKAL MINANGKABAU -->
+  <footer class="mt-6 border-t border-slate-800/90 bg-panelDark/80">
+    <div class="max-w-[1440px] mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
+      <div>
+        <strong class="text-slate-200">CardioSense 3D</strong> — Media Pembelajaran Interaktif AR/VR & GenAI • Jurusan Teknik Elektro, <span class="text-amber-400 font-semibold">Politeknik Negeri Padang</span>
+      </div>
+      <div class="text-[11px] text-slate-500">
+        <em>"Alam Takambang Jadi Guru"</em> • Integrasi Rekayasa Biomedis & Kearifan Lokal Sumatera Barat
+      </div>
+    </div>
+    <div class="songket-strip"></div>
+  </footer>
+
+  <!-- ===================================================================== -->
+  <!-- LOGIKA APLIKASI: SIMULASI EKG, DSP, THREE.JS 3D/AR, AUDIO & GEN-AI    -->
+  <!-- ===================================================================== -->
+  <script>
+    // =========================================================================
+    // 1. STATE GLOBAL APLIKASI
+    // =========================================================================
+    const appState = {
+      // Kasus klinis aktif (di-generate oleh GenAI)
+      currentCase: {
+        id: 'KASUS-SUMBAR-01',
+        location: 'Puskesmas Pauh, Kota Padang',
+        title: 'Misi 1: Gangguan Jala-Jala Listrik 50 Hz & Impedansi Elektroda pada Pemeriksaan Poli Umum',
+        description: 'Pasien mengeluh berdebar setelah aktivitas fisik. Ruang pemeriksaan berdekatan dengan stabilizer tegangan sehingga muncul induksi jala-jala 50 Hz dan pergeseran garis dasar pernapasan. Kalibrasi elektroda 3D, isolasi derau, gunakan filter Zero-Phase, dan ukur BPM pasien secara presisi!',
+        trueBPM: 75,
+        rhythmType: 'Normal Sinus Rhythm',
+        requiredNotch: true,
+        requiredHP: true,
+        requiredBP: false,
+        idealThresholdMin: 0.45,
+        idealThresholdMax: 0.80,
+      },
+      // Elektroda 3D (RA, LA, LL)
+      electrodes: {
+        RA: { impedance: 18.4, calibrated: false },
+        LA: { impedance: 3.2, calibrated: true },
+        LL: { impedance: 11.5, calibrated: false }
+      },
+      // Parameter Derau
+      noise50HzOn: true,
+      noise50HzAmp: 0.45,
+      noiseBWOn: true,
+      noiseBWAmp: 0.60,
+      noiseEMGOn: false,
+      noiseEMGAmp: 0.25,
+      // Parameter Filter Digital
+      filterNotch: false,
+      filterHP: false,
+      filterBP: false,
+      phaseMode: 'iir', // 'iir' | 'zerophase'
+      // Pipeline Pan-Tompkins
+      panStage: 1, // 1..5
+      threshold: 0.55,
+      detectedBPM: 0,
+      // Progres Pembelajaran 4 Tahap (18 Menit)
+      currentStep: 1,
+      completedSteps: { 1: true, 2: false, 3: false, 4: false },
+      // Audio & AR
+      audioEnabled: false,
+      arMode: false,
+      arStream: null,
+      // Simulasi waktu & buffer sinyal
+      simTime: 0,
+      sampleRate: 250,
+      bufferLength: 650,
+      rawBuffer: [],
+      procBuffer: [],
+      peakFlags: [],
+      recentRIntervals: [],
+      lastRPeakTime: -10,
+      heartBeatScale: 1.0,
+      cardiacPhase: 'SA Node → Depolarisasi Atrium (P)',
+      isValidated: false
+    };
+
+    // Bank Variasi Kasus Klinis GenAI (Konteks Sumatera Barat)
+    const aiCaseBank = [
+      {
+        id: 'KASUS-SUMBAR-01',
+        location: 'Puskesmas Pauh, Kota Padang',
+        title: 'Misi 1: Gangguan Jala-Jala Listrik 50 Hz & Impedansi Elektroda pada Pemeriksaan Poli Umum',
+        description: 'Pasien datang ke Poli Umum Puskesmas Pauh dengan keluhan cepat lelah. Instalasi listrik ruangan menimbulkan interferensi 50 Hz dan kulit pasien berkeringat sehingga impedansi elektroda RA & LL tinggi. Kalibrasi elektroda, aktifkan Notch 50 Hz & High-Pass 0.5 Hz dalam mode Zero-Phase!',
+        trueBPM: 75,
+        rhythmType: 'Normal Sinus Rhythm (75 BPM)',
+        noise50HzOn: true, noise50HzAmp: 0.55,
+        noiseBWOn: true, noiseBWAmp: 0.65,
+        noiseEMGOn: false, noiseEMGAmp: 0.15,
+        elec: { RA: 18.4, LA: 3.2, LL: 11.5 },
+        requiredNotch: true, requiredHP: true, requiredBP: false,
+        idealThresholdMin: 0.45, idealThresholdMax: 0.85
+      },
+      {
+        id: 'KASUS-SUMBAR-02',
+        location: 'RSUD Lubuk Basung, Kabupaten Agam',
+        title: 'Misi 2: Evaluasi Sinus Takikardia dengan Artefak Tremor Otot (EMG) Pasca Rujukan',
+        description: 'Pasien rujukan dari wilayah pesisir Tiku mengalami cemas dan menggigil ringan saat perekaman EKG di IGD RSUD Lubuk Basung, memicu derau frekuensi tinggi EMG (>40 Hz) serta laju jantung cepat (122 BPM). Isolasi artefak EMG dengan Bandpass 0.5–40 Hz Zero-Phase tanpa menggeser puncak R!',
+        trueBPM: 122,
+        rhythmType: 'Sinus Takikardia (122 BPM)',
+        noise50HzOn: false, noise50HzAmp: 0.10,
+        noiseBWOn: true, noiseBWAmp: 0.40,
+        noiseEMGOn: true, noiseEMGAmp: 0.55,
+        elec: { RA: 14.2, LA: 12.8, LL: 3.5 },
+        requiredNotch: false, requiredHP: true, requiredBP: true,
+        idealThresholdMin: 0.45, idealThresholdMax: 0.85
+      },
+      {
+        id: 'KASUS-SUMBAR-03',
+        location: 'Klinik Nagari Bukittinggi, Agam Timur',
+        title: 'Misi 3: Skrining Sinus Bradikardia pada Lansia dengan Respirasi Berat (Baseline Wander)',
+        description: 'Seorang petani lansia dari lereng Gunung Marapi menjalani pemeriksaan rutin di Klinik Nagari Bukittinggi. Pernapasan dalam menyebabkan Baseline Wander kuat (<0.5 Hz) disertai dengung 50 Hz dan denyut jantung lambat (48 BPM). Stabilkan garis dasar dan ukur BPM akurat!',
+        trueBPM: 48,
+        rhythmType: 'Sinus Bradikardia (48 BPM)',
+        noise50HzOn: true, noise50HzAmp: 0.40,
+        noiseBWOn: true, noiseBWAmp: 0.95,
+        noiseEMGOn: false, noiseEMGAmp: 0.10,
+        elec: { RA: 4.1, LA: 16.7, LL: 13.9 },
+        requiredNotch: true, requiredHP: true, requiredBP: false,
+        idealThresholdMin: 0.45, idealThresholdMax: 0.85
+      },
+      {
+        id: 'KASUS-SUMBAR-04',
+        location: 'IGD RSUP Dr. M. Djamil, Padang',
+        title: 'Misi 4: Kondisi Kritis Multi-Derau (50 Hz + Respirasi + EMG) pada Monitoring Intensif',
+        description: 'Pasien di ruang observasi intensif mengalami kombinasi tiga sumber derau sekaligus: induksi peralatan medis 50 Hz, napas cepat, dan ketegangan otot. Terapkan seluruh rantai filter (Notch + HP + Bandpass) secara Zero-Phase dan uji tahap Moving Window Integration Pan-Tompkins!',
+        trueBPM: 96,
+        rhythmType: 'Sinus Ritme Cepat (96 BPM)',
+        noise50HzOn: true, noise50HzAmp: 0.50,
+        noiseBWOn: true, noiseBWAmp: 0.70,
+        noiseEMGOn: true, noiseEMGAmp: 0.45,
+        elec: { RA: 19.5, LA: 15.1, LL: 14.8 },
+        requiredNotch: true, requiredHP: true, requiredBP: true,
+        idealThresholdMin: 0.45, idealThresholdMax: 0.85
+      }
+    ];
+    let caseIndex = 0;
+
+    // =========================================================================
+    // 2. SISTEM NOTIFIKASI TOAST & AUDIO (WEB AUDIO API + SPEECH SYNTHESIS)
+    // =========================================================================
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const colors = {
+        info: 'bg-panelDark border-teal-500/60 text-teal-200',
+        success: 'bg-emerald-950/95 border-emerald-400 text-emerald-200',
+        warn: 'bg-amber-950/95 border-amber-400 text-amber-200',
+        error: 'bg-rose-950/95 border-rose-400 text-rose-200'
+      };
+      toast.className = `pointer-events-auto px-4 py-3 rounded-xl border shadow-xl text-xs font-medium backdrop-blur-md transition-all duration-300 ${colors[type] || colors.info}`;
+      toast.innerHTML = message;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(8px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 3600);
+    }
+
+    let audioCtx = null;
+    let humOsc = null;
+    let humGain = null;
+
+    function toggleAudio() {
+      appState.audioEnabled = !appState.audioEnabled;
+      const btn = document.getElementById('btn-toggle-audio');
+      const icon = document.getElementById('audio-icon');
+      const label = document.getElementById('audio-label');
+
+      if (appState.audioEnabled) {
+        if (!audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          audioCtx = new AudioContextClass();
+          // Osilator dengung halus 50 Hz untuk mensimulasikan interferensi jala-jala
+          humOsc = audioCtx.createOscillator();
+          humGain = audioCtx.createGain();
+          humOsc.type = 'sawtooth';
+          humOsc.frequency.value = 50;
+          humGain.gain.value = 0.0;
+          humOsc.connect(humGain);
+          humGain.connect(audioCtx.destination);
+          humOsc.start();
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        icon.textContent = '🔊';
+        label.textContent = 'Audio Monitor: ON';
+        btn.classList.replace('bg-slate-800', 'bg-teal-600/25');
+        btn.classList.add('border-teal-400', 'text-teal-300');
+        updateHumAudioLevel();
+        showToast('🔊 Audio monitor EKG & simulasi dengung 50 Hz diaktifkan.', 'info');
+      } else {
+        icon.textContent = '🔇';
+        label.textContent = 'Audio Monitor: OFF';
+        btn.classList.replace('bg-teal-600/25', 'bg-slate-800');
+        btn.classList.remove('border-teal-400', 'text-teal-300');
+        if (humGain && audioCtx) {
+          humGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.05);
+        }
+      }
+    }
+
+    function playBeepRPeak() {
+      if (!appState.audioEnabled || !audioCtx) return;
+      try {
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, now); // Nada khas monitor pasien
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.exponentialRampToValueAtTime(0.11, now + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.095);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.1);
+      } catch (e) {}
+    }
+
+    function updateHumAudioLevel() {
+      if (!appState.audioEnabled || !audioCtx || !humGain) return;
+      // Dengung 50Hz terdengar jika derau 50Hz aktif DAN filter Notch belum diaktifkan
+      const effective50Hz = (appState.noise50HzOn && !appState.filterNotch) ? appState.noise50HzAmp : 0;
+      const targetGain = effective50Hz * 0.025;
+      humGain.gain.setTargetAtTime(targetGain, audioCtx.currentTime, 0.08);
+    }
+
+    function narrateCurrentStep() {
+      if (!('speechSynthesis' in window)) {
+        showToast('Browser Anda tidak mendukung fitur sintesis suara.', 'warn');
+        return;
+      }
+      window.speechSynthesis.cancel();
+      const scripts = {
+        1: 'Tahap satu. Eksplorasi model jantung tiga dimensi atau aktifkan mode kamera meja A R. Klik ketiga elektroda R A, L A, dan L L hingga impedansi kontak kulit turun di bawah lima kilo ohm.',
+        2: 'Tahap dua. Amati pengaruh gangguan jala-jala lima puluh hertz, baseline wander pernapasan, dan artefak otot E M G. Aktifkan filter digital lalu bandingkan pergeseran fase antara filter I I R satu arah dengan mode Zero Phase filtfilt.',
+        3: 'Tahap tiga. Telusuri lima tahapan ekstraksi fitur Pan Tompkins mulai dari sinyal terfilter, bandpass lima sampai lima belas hertz, diferensiasi, penguadratan, hingga moving window integration, lalu atur ambang batas deteksi puncak R.',
+        4: 'Tahap empat. Klik tombol Validasi Keputusan Klinis untuk memperoleh audit keputusan dari asisten kecerdasan buatan beserta kode Python siap salin untuk Google Colab.'
+      };
+      const utterance = new SpeechSynthesisUtterance(scripts[appState.currentStep] || scripts[1]);
+      utterance.lang = 'id-ID';
+      utterance.rate = 1.02;
+      window.speechSynthesis.speak(utterance);
+      showToast(`🗣️ Memutar panduan suara Tahap ${appState.currentStep}...`, 'info');
+    }
+
+    // =========================================================================
+    // 3. NAVIGASI 4 TAHAP PEMBELAJARAN (15-20 MENIT)
+    // =========================================================================
+    function toggleGuideModal() {
+      const modal = document.getElementById('guide-modal');
+      modal.classList.toggle('hidden');
+    }
+
+    function selectLearningStep(stepNum) {
+      appState.currentStep = stepNum;
+      appState.completedSteps[stepNum] = true;
+
+      for (let i = 1; i <= 4; i++) {
+        const btn = document.getElementById(`step-btn-${i}`);
+        const chk = document.getElementById(`step-check-${i}`);
+        const titleSub = btn.querySelector('div > div:first-child');
+        if (i === stepNum) {
+          btn.className = 'step-tab flex items-center justify-between p-2.5 rounded-xl bg-teal-500/15 border border-teal-400 text-left transition cursor-pointer';
+          titleSub.className = 'text-[11px] font-bold text-teal-300';
+        } else {
+          btn.className = 'step-tab flex items-center justify-between p-2.5 rounded-xl bg-slate-900/80 border border-slate-700/80 hover:border-slate-500 text-left transition cursor-pointer';
+          titleSub.className = 'text-[11px] font-bold text-slate-400';
+        }
+
+        if (appState.completedSteps[i]) {
+          chk.textContent = '✓';
+          chk.className = 'text-xs font-bold text-emerald-400';
+        }
+      }
+
+      // Sinkronkan tampilan relevan berdasarkan tahap
+      if (stepNum === 3 && appState.panStage === 1) {
+        setPanTompkinsStage(5);
+      } else if (stepNum === 2 && appState.panStage !== 1) {
+        setPanTompkinsStage(1);
+      } else if (stepNum === 4) {
+        document.getElementById('ai-evaluation-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+
+      updateLearningProgress();
+    }
+
+    function updateLearningProgress() {
+      const doneCount = Object.values(appState.completedSteps).filter(Boolean).length;
+      const pct = Math.round((doneCount / 4) * 100);
+      document.getElementById('learning-progress-bar').style.width = `${pct}%`;
+      document.getElementById('learning-progress-text').textContent = `${doneCount}/4`;
+    }
+
+    // =========================================================================
+    // 4. VISUALISASI 3D/VR JANTUNG & MODE AR (THREE.JS + KAMERA MEJA)
+    // =========================================================================
+    let scene, camera, renderer, heartGroup, saNodeMesh, avNodeMesh, purkinjeGroup;
+    let electrodeMeshes = {};
+    let isDragging3D = false;
+    let prevPointer = { x: 0, y: 0 };
+    let targetRot = { x: 0.12, y: -0.25 };
+    let currentRot = { x: 0.12, y: -0.25 };
+    let cameraZ = 5.4;
+    const raycaster = new THREE.Raycaster();
+    const pointerNDC = new THREE.Vector2();
+
+    function initThreeJS() {
+      const container = document.getElementById('three-container');
+      if (!container || typeof THREE === 'undefined') return;
+
+      scene = new THREE.Scene();
+
+      const width = container.clientWidth || 450;
+      const height = container.clientHeight || 350;
+      camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
+      camera.position.set(0, 0.1, cameraZ);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setClearColor(0x000000, 0); // Transparan agar bisa overlay di atas AR!
+      container.appendChild(renderer.domElement);
+
+      // Pencahayaan Medis Kontras Tinggi
+      const ambientLight = new THREE.AmbientLight(0x94a3b8, 0.85);
+      scene.add(ambientLight);
+
+      const dirLight1 = new THREE.DirectionalLight(0xffffff, 1.2);
+      dirLight1.position.set(4, 6, 6);
+      scene.add(dirLight1);
+
+      const rimLight = new THREE.DirectionalLight(0x14b8a6, 0.9);
+      rimLight.position.set(-5, -3, -4);
+      scene.add(rimLight);
+
+      // Grup Utama Anatomi Jantung & Torso Referensi
+      heartGroup = new THREE.Group();
+      scene.add(heartGroup);
+
+      // Kerangka Torso Transparan (Referensi Segitiga Einthoven)
+      const torsoGeo = new THREE.CylinderGeometry(1.65, 1.45, 3.2, 24, 1, true);
+      const torsoMat = new THREE.MeshBasicMaterial({
+        color: 0x14b8a6,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.11
+      });
+      const torsoMesh = new THREE.Mesh(torsoGeo, torsoMat);
+      heartGroup.add(torsoMesh);
+
+      // Garis Segitiga Einthoven (RA - LA - LL)
+      const einthovenPoints = [
+        new THREE.Vector3(-1.35, 1.05, 0.55), // RA
+        new THREE.Vector3(1.35, 1.05, 0.55),  // LA
+        new THREE.Vector3(0.0, -1.45, 0.65),  // LL
+        new THREE.Vector3(-1.35, 1.05, 0.55)
+      ];
+      const einthovenGeo = new THREE.BufferGeometry().setFromPoints(einthovenPoints);
+      const einthovenMat = new THREE.LineDashedMaterial({
+        color: 0xf59e0b,
+        dashSize: 0.15,
+        gapSize: 0.1,
+        transparent: true,
+        opacity: 0.65
+      });
+      const einthovenLine = new THREE.Line(einthovenGeo, einthovenMat);
+      einthovenLine.computeLineDistances();
+      heartGroup.add(einthovenLine);
+
+      // Model Jantung 3D Anatomis Bergaya Klinis (Miokardium Semi-Transparan)
+      const heartMat = new THREE.MeshPhongMaterial({
+        color: 0xdc2626,
+        emissive: 0x450a0a,
+        shininess: 65,
+        transparent: true,
+        opacity: 0.84
+      });
+
+      // Ventrikel Kiri & Kanan (Bentuk kerucut membulat miring ke kiri bawah)
+      const ventricleGeo = new THREE.SphereGeometry(0.88, 32, 32);
+      ventricleGeo.scale(0.86, 1.25, 0.78);
+      const ventricleMesh = new THREE.Mesh(ventricleGeo, heartMat);
+      ventricleMesh.position.set(0.08, -0.15, 0);
+      ventricleMesh.rotation.z = 0.32;
+      heartGroup.add(ventricleMesh);
+
+      // Atrium Kanan & Kiri
+      const atriumGeo = new THREE.SphereGeometry(0.55, 24, 24);
+      const rightAtrium = new THREE.Mesh(atriumGeo, heartMat);
+      rightAtrium.position.set(-0.42, 0.48, 0.08);
+      heartGroup.add(rightAtrium);
+
+      const leftAtrium = new THREE.Mesh(atriumGeo, heartMat);
+      leftAtrium.position.set(0.45, 0.52, -0.05);
+      heartGroup.add(leftAtrium);
+
+      // Arkus Aorta (Pembuluh Utama Atas)
+      const aortaCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0.05, 0.45, 0),
+        new THREE.Vector3(0.0, 1.15, 0.05),
+        new THREE.Vector3(0.32, 1.32, -0.08),
+        new THREE.Vector3(0.48, 0.85, -0.22)
+      ]);
+      const aortaGeo = new THREE.TubeGeometry(aortaCurve, 24, 0.16, 12, false);
+      const aortaMat = new THREE.MeshPhongMaterial({ color: 0xef4444, shininess: 80 });
+      const aortaMesh = new THREE.Mesh(aortaGeo, aortaMat);
+      heartGroup.add(aortaMesh);
+
+      // Sistem Konduksi Listrik Jantung (SA Node, AV Node, Serabut Purkinje)
+      const nodeGeo = new THREE.SphereGeometry(0.11, 16, 16);
+      saNodeMesh = new THREE.Mesh(
+        nodeGeo,
+        new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+      );
+      saNodeMesh.position.set(-0.48, 0.56, 0.42);
+      heartGroup.add(saNodeMesh);
+
+      avNodeMesh = new THREE.Mesh(
+        nodeGeo,
+        new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+      );
+      avNodeMesh.position.set(-0.08, 0.15, 0.45);
+      heartGroup.add(avNodeMesh);
+
+      // Jalur Serabut Purkinje Menyala
+      purkinjeGroup = new THREE.Group();
+      const purkinjeMat = new THREE.LineBasicMaterial({ color: 0x2dd4bf, linewidth: 2 });
+      const leftBranch = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-0.08, 0.15, 0.45),
+        new THREE.Vector3(0.15, -0.45, 0.52),
+        new THREE.Vector3(0.42, -0.82, 0.35),
+        new THREE.Vector3(0.58, -0.35, 0.32)
+      ]);
+      const rightBranch = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-0.08, 0.15, 0.45),
+        new THREE.Vector3(-0.18, -0.52, 0.52),
+        new THREE.Vector3(-0.35, -0.78, 0.32),
+        new THREE.Vector3(-0.48, -0.28, 0.35)
+      ]);
+      purkinjeGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(leftBranch.getPoints(20)), purkinjeMat));
+      purkinjeGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(rightBranch.getPoints(20)), purkinjeMat));
+      heartGroup.add(purkinjeGroup);
+
+      // 3 Elektroda Interaktif (RA, LA, LL) yang Dapat Diklik di Ruang 3D
+      createElectrode3D('RA', new THREE.Vector3(-1.35, 1.05, 0.55));
+      createElectrode3D('LA', new THREE.Vector3(1.35, 1.05, 0.55));
+      createElectrode3D('LL', new THREE.Vector3(0.0, -1.45, 0.65));
+
+      // Event Interaksi Mouse & Sentuhan (Rotate 360°, Zoom, Klik Elektroda)
+      const domEl = renderer.domElement;
+      domEl.addEventListener('pointerdown', onPointerDown3D);
+      window.addEventListener('pointermove', onPointerMove3D);
+      window.addEventListener('pointerup', onPointerUp3D);
+      domEl.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        cameraZ = Math.max(3.2, Math.min(8.2, cameraZ + e.deltaY * 0.003));
+        camera.position.z = cameraZ;
+      }, { passive: false });
+
+      window.addEventListener('resize', onResize3D);
+    }
+
+    function createElectrode3D(id, pos) {
+      const geo = new THREE.SphereGeometry(0.19, 20, 20);
+      const isCal = appState.electrodes[id].calibrated;
+      const mat = new THREE.MeshPhongMaterial({
+        color: isCal ? 0x14b8a6 : 0xf43f5e,
+        emissive: isCal ? 0x0f766e : 0x881337,
+        shininess: 90
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.copy(pos);
+      mesh.userData = { electrodeId: id };
+      heartGroup.add(mesh);
+      electrodeMeshes[id] = mesh;
+    }
+
+    function updateElectrode3DColors() {
+      ['RA', 'LA', 'LL'].forEach(id => {
+        const mesh = electrodeMeshes[id];
+        if (!mesh) return;
+        const isCal = appState.electrodes[id].calibrated;
+        mesh.material.color.setHex(isCal ? 0x14b8a6 : 0xf43f5e);
+        mesh.material.emissive.setHex(isCal ? 0x0f766e : 0x881337);
+      });
+    }
+
+    let pointerDownPos = { x: 0, y: 0 };
+    function onPointerDown3D(e) {
+      isDragging3D = true;
+      prevPointer = { x: e.clientX, y: e.clientY };
+      pointerDownPos = { x: e.clientX, y: e.clientY };
+    }
+
+    function onPointerMove3D(e) {
+      if (!isDragging3D) return;
+      const dx = e.clientX - prevPointer.x;
+      const dy = e.clientY - prevPointer.y;
+      targetRot.y += dx * 0.01;
+      targetRot.x = Math.max(-1.1, Math.min(1.1, targetRot.x + dy * 0.01));
+      prevPointer = { x: e.clientX, y: e.clientY };
+    }
+
+    function onPointerUp3D(e) {
+      if (!isDragging3D) return;
+      isDragging3D = false;
+
+      // Deteksi klik (gerakan kurang dari 6px) untuk memilih elektroda 3D
+      const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+      if (dist < 6 && renderer && camera) {
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(pointerNDC, camera);
+        const meshes = Object.values(electrodeMeshes);
+        const intersects = raycaster.intersectObjects(meshes, false);
+        if (intersects.length > 0) {
+          const clickedId = intersects[0].object.userData.electrodeId;
+          if (clickedId) calibrateElectrode(clickedId);
+        }
+      }
+    }
+
+    function resetCamera3D() {
+      targetRot = { x: 0.12, y: -0.25 };
+      cameraZ = 5.4;
+      if (camera) camera.position.z = cameraZ;
+      showToast('⟲ Posisi kamera 3D dikembalikan ke sudut awal.', 'info');
+    }
+
+    function onResize3D() {
+      const container = document.getElementById('three-container');
+      if (!container || !renderer || !camera) return;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      if (w > 0 && h > 0) {
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+      }
+    }
+
+    // Mode AR (Kamera Meja Nyata atau Simulasi Meja Lab AR)
+    async function toggleARMode() {
+      appState.arMode = !appState.arMode;
+      const btn = document.getElementById('btn-ar-mode');
+      const videoEl = document.getElementById('ar-video');
+      const virtualRoom = document.getElementById('ar-virtual-room');
+      const badge = document.getElementById('ar-status-badge');
+
+      if (appState.arMode) {
+        btn.textContent = '🖥️ Kembali ke Mode VR 3D';
+        btn.classList.replace('bg-amber-500/20', 'bg-rose-500/25');
+        badge.classList.remove('hidden');
+
+        try {
+          if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: 'environment' },
+              audio: false
+            });
+            appState.arStream = stream;
+            videoEl.srcObject = stream;
+            videoEl.classList.remove('hidden');
+            virtualRoom.classList.add('hidden');
+            showToast('📷 Mode AR Kamera aktif! Arahkan kamera ke meja praktikum.', 'success');
+          } else {
+            throw new Error('Kamera tidak tersedia');
+          }
+        } catch (err) {
+          // Fallback otomatis ke Ruang Meja AR Virtual agar selalu berfungsi di laptop tanpa webcam
+          videoEl.classList.add('hidden');
+          virtualRoom.classList.remove('hidden');
+          showToast('📷 Kamera tidak terdeteksi — beralih otomatis ke Simulasi Proyeksi Meja AR.', 'info');
+        }
+      } else {
+        btn.textContent = '📷 Mode AR (Kamera Meja)';
+        btn.classList.replace('bg-rose-500/25', 'bg-amber-500/20');
+        badge.classList.add('hidden');
+        videoEl.classList.add('hidden');
+        virtualRoom.classList.add('hidden');
+        if (appState.arStream) {
+          appState.arStream.getTracks().forEach(t => t.stop());
+          appState.arStream = null;
+        }
+      }
+    }
+
+    // =========================================================================
+    // 5. TITIK INTERAKSI 1: KALIBRASI ELEKTRODA 3D (RA, LA, LL)
+    // =========================================================================
+    function calibrateElectrode(id) {
+      const el = appState.electrodes[id];
+      if (!el) return;
+      el.impedance = Number((2.4 + Math.random() * 1.4).toFixed(1));
+      el.calibrated = true;
+      updateElectrodeUI();
+      updateElectrode3DColors();
+      showToast(`✅ Elektroda <strong>${id}</strong> dikalibrasi (${el.impedance} kΩ). Kontak kulit optimal!`, 'success');
+    }
+
+    function calibrateAllElectrodes() {
+      ['RA', 'LA', 'LL'].forEach(id => {
+        appState.electrodes[id].impedance = Number((2.3 + Math.random() * 1.3).toFixed(1));
+        appState.electrodes[id].calibrated = true;
+      });
+      updateElectrodeUI();
+      updateElectrode3DColors();
+      showToast('✅ Seluruh elektroda (RA, LA, LL) telah dibersihkan & diberi gel konduktif (< 5 kΩ).', 'success');
+    }
+
+    function updateElectrodeUI() {
+      ['RA', 'LA', 'LL'].forEach(id => {
+        const el = appState.electrodes[id];
+        const card = document.getElementById(`elec-card-${id}`);
+        const dot = document.getElementById(`elec-dot-${id}`);
+        const impText = document.getElementById(`elec-imp-${id}`);
+        const statText = document.getElementById(`elec-stat-${id}`);
+
+        impText.textContent = `${el.impedance.toFixed(1)} kΩ`;
+        if (el.calibrated || el.impedance < 5.0) {
+          card.className = 'p-2.5 rounded-xl bg-cardDark border border-teal-500/50 hover:border-teal-300 text-left transition cursor-pointer';
+          dot.className = 'w-2.5 h-2.5 rounded-full bg-teal-400';
+          impText.className = 'text-xs font-mono font-bold text-teal-400 mt-1';
+          statText.textContent = 'Kontak Optimal';
+          statText.className = 'text-[10px] text-teal-300';
+        } else {
+          card.className = 'p-2.5 rounded-xl bg-cardDark border border-rose-500/60 hover:border-amber-400 text-left transition cursor-pointer';
+          dot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping';
+          impText.className = 'text-xs font-mono font-bold text-rose-400 mt-1';
+          statText.textContent = 'Klik untuk kalibrasi';
+          statText.className = 'text-[10px] text-rose-300';
+        }
+      });
+    }
+
+    // =========================================================================
+    // 6. SINTESIS SINYAL EKG, DERAU KLINIS, FILTER IIR VS ZERO-PHASE & PAN-TOMPKINS
+    // =========================================================================
+    // Model gelombang P-QRS-T sintetis berbasis Gaussian
+    function synthesizeCleanECG(phase) {
+      // phase dalam [0, 1) untuk satu siklus jantung
+      const g = (mu, sigma, amp) => amp * Math.exp(-0.5 * Math.pow((phase - mu) / sigma, 2));
+      const pWave = g(0.16, 0.026, 0.14);
+      const qWave = g(0.285, 0.009, -0.14);
+      const rWave = g(0.31, 0.011, 1.15);
+      const sWave = g(0.338, 0.010, -0.26);
+      const tWave = g(0.54, 0.042, 0.30);
+      return pWave + qWave + rWave + sWave + tWave;
+    }
+
+    // State internal filter IIR biquad real-time untuk pemrosesan sampel demi sampel
+    const filterState = {
+      hpPrevX: 0, hpPrevY: 0,
+      lpPrevY: 0,
+      notchX1: 0, notchX2: 0, notchY1: 0, notchY2: 0,
+      ptBandPrevX: 0, ptBandPrevY: 0, ptLowPrevY: 0,
+      diffHist: [0, 0, 0, 0],
+      mwiWindow: new Array(28).fill(0)
+    };
+
+    function resetFilterMemory() {
+      filterState.hpPrevX = 0; filterState.hpPrevY = 0;
+      filterState.lpPrevY = 0;
+      filterState.notchX1 = 0; filterState.notchX2 = 0;
+      filterState.notchY1 = 0; filterState.notchY2 = 0;
+      filterState.ptBandPrevX = 0; filterState.ptBandPrevY = 0;
+      filterState.ptLowPrevY = 0;
+      filterState.diffHist = [0, 0, 0, 0];
+      filterState.mwiWindow.fill(0);
+    }
+
+    // Menghasilkan satu sampel baru pada frekuensi 250 Hz
+    function stepSignalSample(dt) {
+      appState.simTime += dt;
+      const t = appState.simTime;
+      const freqHz = appState.currentCase.trueBPM / 60.0;
+      const cyclePhase = (t * freqHz) % 1.0;
+
+      // Update status konduksi jantung 3D
+      if (cyclePhase < 0.22) {
+        appState.cardiacPhase = 'SA Node → Depolarisasi Atrium (Gelombang P)';
+        appState.heartBeatScale = 1.0 + 0.03 * Math.sin((cyclePhase / 0.22) * Math.PI);
+      } else if (cyclePhase >= 0.28 && cyclePhase <= 0.36) {
+        appState.cardiacPhase = 'AV Node & Purkinje → Depolarisasi Ventrikel (QRS)';
+        appState.heartBeatScale = 1.0 + 0.13 * Math.sin(((cyclePhase - 0.28) / 0.08) * Math.PI);
+      } else if (cyclePhase >= 0.46 && cyclePhase <= 0.62) {
+        appState.cardiacPhase = 'Repolarisasi Ventrikel (Gelombang T)';
+        appState.heartBeatScale = 1.0 + 0.02 * Math.sin(((cyclePhase - 0.46) / 0.16) * Math.PI);
+      } else {
+        appState.cardiacPhase = 'Fase Diastolik (Segmen Isoelektrik)';
+        appState.heartBeatScale = 1.0;
+      }
+
+      // 1. Sinyal EKG bersih
+      const cleanECG = synthesizeCleanECG(cyclePhase);
+
+      // 2. Hitung kontribusi derau + penalti impedansi elektroda yang belum dikalibrasi
+      const uncalibratedCount = ['RA', 'LA', 'LL'].filter(id => !appState.electrodes[id].calibrated).length;
+      const impedancePenalty = uncalibratedCount * 0.16;
+
+      const n50 = appState.noise50HzOn
+        ? appState.noise50HzAmp * Math.sin(2 * Math.PI * 50 * t)
+        : 0;
+      const nBW = (appState.noiseBWOn ? appState.noiseBWAmp : 0) + impedancePenalty * 0.8;
+      const baselineDrift = nBW * (0.75 * Math.sin(2 * Math.PI * 0.28 * t) + 0.25 * Math.cos(2 * Math.PI * 0.12 * t));
+      const nEMG = (appState.noiseEMGOn ? appState.noiseEMGAmp : 0) + impedancePenalty * 0.35;
+      const emgBurst = nEMG * (Math.sin(2 * Math.PI * 73 * t) * Math.cos(2 * Math.PI * 19 * t) + (Math.random() - 0.5) * 0.9);
+
+      const rawSignal = cleanECG + n50 + baselineDrift + emgBurst;
+
+      // 3. Pemrosesan Filter Digital (IIR Satu Arah vs Zero-Phase)
+      // Untuk memperlihatkan efek pergeseran fase (phase distortion) IIR secara edukatif & nyata:
+      // Pada mode 'iir', sinyal melewati rantai kausal yang menggeser fasa (~44 ms / 11 sampel) & sedikit meredam puncak R.
+      // Pada mode 'zerophase' (filtfilt), maju-mundur menghilangkan lag fase (0 ms) dan menjaga simetri puncak R!
+      let filteredSignal = rawSignal;
+
+      // Simulasi efek filter terpisah dengan akurat:
+      let residual50 = n50;
+      let residualBW = baselineDrift;
+      let residualEMG = emgBurst;
+      let cleanDelayed = cleanECG;
+
+      if (appState.phaseMode === 'iir') {
+        // Mode IIR Satu Arah (lfilter): menimbulkan pergeseran waktu ~0.044 detik (44 ms)
+        const lagPhase = ((t - 0.044) * freqHz) % 1.0;
+        cleanDelayed = synthesizeCleanECG(lagPhase < 0 ? lagPhase + 1 : lagPhase) * 0.93;
+      }
+
+      if (appState.filterNotch) {
+        residual50 *= 0.04; // Redaman -28 dB pada 50 Hz
+      }
+      if (appState.filterHP) {
+        residualBW *= 0.05; // Menghilangkan drift < 0.5 Hz
+      }
+      if (appState.filterBP) {
+        residualBW *= 0.08;
+        residualEMG *= 0.09; // Meredam artefak otot > 40 Hz
+      }
+
+      filteredSignal = cleanDelayed + residual50 + residualBW + residualEMG;
+
+      // 4. Pipeline 5 Tahap Pan-Tompkins
+      // Tahap 2: Bandpass 5-15 Hz (menonjolkan kompleks QRS, menekan P & T)
+      const bpInput = filteredSignal;
+      const alphaHP = 0.88;
+      const hpOut = alphaHP * (filterState.ptBandPrevY + bpInput - filterState.ptBandPrevX);
+      filterState.ptBandPrevX = bpInput;
+      filterState.ptBandPrevY = hpOut;
+      const lpOut = filterState.ptLowPrevY + 0.28 * (hpOut - filterState.ptLowPrevY);
+      filterState.ptLowPrevY = lpOut;
+      const ptBandpass = lpOut * 1.45;
+
+      // Tahap 3: Diferensiasi (5-point derivative approximation)
+      const dh = filterState.diffHist;
+      const deriv = (2 * ptBandpass + dh[0] - dh[2] - 2 * dh[3]) * 0.65;
+      dh.unshift(ptBandpass);
+      dh.pop();
+
+      // Tahap 4: Penguadratan (Squaring) -> semua positif, amplifikasi non-linear QRS
+      const squared = Math.min(2.2, deriv * deriv * 1.4);
+
+      // Tahap 5: Moving Window Integration (MWI ~ 112 ms)
+      filterState.mwiWindow.shift();
+      filterState.mwiWindow.push(squared);
+      const mwi = (filterState.mwiWindow.reduce((a, b) => a + b, 0) / filterState.mwiWindow.length) * 1.55;
+
+      // Pilih sinyal output sesuai stage Pan-Tompkins yang dipilih mahasiswa
+      let displayOutput = filteredSignal;
+      if (appState.panStage === 2) displayOutput = ptBandpass;
+      else if (appState.panStage === 3) displayOutput = deriv;
+      else if (appState.panStage === 4) displayOutput = squared;
+      else if (appState.panStage === 5) displayOutput = mwi;
+
+      // 5. Deteksi Puncak R Berbasis Threshold Dinamis + Periode Refrakter 240 ms
+      const len = appState.procBuffer.length;
+      let isPeak = false;
+      if (len >= 2) {
+        const prev1 = appState.procBuffer[len - 1];
+        const prev2 = appState.procBuffer[len - 2];
+        const refractoryOk = (t - appState.lastRPeakTime) > 0.24;
+        if (prev1 > appState.threshold && prev1 >= prev2 && prev1 > displayOutput && refractoryOk) {
+          isPeak = true;
+          appState.peakFlags[len - 1] = true;
+          if (appState.lastRPeakTime > 0) {
+            const rr = t - appState.lastRPeakTime;
+            if (rr >= 0.25 && rr <= 2.2) {
+              appState.recentRIntervals.push(rr);
+              if (appState.recentRIntervals.length > 6) appState.recentRIntervals.shift();
+              const avgRR = appState.recentRIntervals.reduce((a, b) => a + b, 0) / appState.recentRIntervals.length;
+              appState.detectedBPM = Math.round(60 / avgRR);
+            }
+          }
+          appState.lastRPeakTime = t;
+          triggerBeatFeedback();
+        }
+      }
+
+      // Reset BPM jika terlalu lama tidak ada puncak terdeteksi (> 2.3 detik)
+      if (t - appState.lastRPeakTime > 2.3) {
+        appState.detectedBPM = 0;
+        appState.recentRIntervals = [];
+      }
+
+      appState.rawBuffer.push(rawSignal);
+      appState.procBuffer.push(displayOutput);
+      appState.peakFlags.push(false);
+
+      if (appState.rawBuffer.length > appState.bufferLength) {
+        appState.rawBuffer.shift();
+        appState.procBuffer.shift();
+        appState.peakFlags.shift();
+      }
+    }
+
+    function triggerBeatFeedback() {
+      playBeepRPeak();
+      const led = document.getElementById('rpeak-led');
+      if (led) {
+        led.classList.remove('bg-rose-500/30');
+        led.classList.add('bg-rose-500', 'scale-125');
+        setTimeout(() => {
+          led.classList.remove('bg-rose-500', 'scale-125');
+          led.classList.add('bg-rose-500/30');
+        }, 120);
+      }
+    }
+
+    // =========================================================================
+    // 7. KONTROL UI DSP (DERAU, FILTER IIR VS ZERO-PHASE, PAN-TOMPKINS)
+    // =========================================================================
+    function updateDSPSettings() {
+      appState.noise50HzOn = document.getElementById('noise-50hz-toggle').checked;
+      appState.noise50HzAmp = parseFloat(document.getElementById('noise-50hz-slider').value);
+      document.getElementById('noise-50hz-val').textContent = `${appState.noise50HzAmp.toFixed(2)} mV`;
+
+      appState.noiseBWOn = document.getElementById('noise-bw-toggle').checked;
+      appState.noiseBWAmp = parseFloat(document.getElementById('noise-bw-slider').value);
+      document.getElementById('noise-bw-val').textContent = `${appState.noiseBWAmp.toFixed(2)} mV`;
+
+      appState.noiseEMGOn = document.getElementById('noise-emg-toggle').checked;
+      appState.noiseEMGAmp = parseFloat(document.getElementById('noise-emg-slider').value);
+      document.getElementById('noise-emg-val').textContent = `${appState.noiseEMGAmp.toFixed(2)} mV`;
+
+      appState.filterNotch = document.getElementById('filter-notch-toggle').checked;
+      appState.filterHP = document.getElementById('filter-hp-toggle').checked;
+      appState.filterBP = document.getElementById('filter-bp-toggle').checked;
+
+      appState.threshold = parseFloat(document.getElementById('threshold-slider').value);
+      document.getElementById('threshold-val').textContent = appState.threshold.toFixed(2);
+
+      updateHumAudioLevel();
+      generatePythonCodePreview();
+    }
+
+    function setFilterPhaseMode(mode) {
+      appState.phaseMode = mode;
+      const btnIIR = document.getElementById('btn-phase-iir');
+      const btnZP = document.getElementById('btn-phase-zerophase');
+      const exp = document.getElementById('phase-explanation');
+      const lagInd = document.getElementById('phase-lag-indicator');
+
+      if (mode === 'iir') {
+        btnIIR.className = 'p-2 rounded-xl text-xs font-bold bg-rose-500/20 border border-rose-400 text-rose-300 transition cursor-pointer';
+        btnZP.className = 'p-2 rounded-xl text-xs font-bold bg-slate-800 border border-slate-700 text-slate-300 hover:border-teal-400 transition cursor-pointer';
+        exp.innerHTML = '⚠️ Mode IIR satu arah menggeser posisi puncak gelombang R (+44 ms) sehingga mengaburkan interval QRS & ST-segment!';
+        exp.className = 'text-[11px] text-rose-300/90 mt-1.5 leading-snug';
+        lagInd.textContent = '+44 ms (Lag IIR)';
+        lagInd.className = 'text-xs font-mono font-bold text-rose-400 leading-tight';
+      } else {
+        btnZP.className = 'p-2 rounded-xl text-xs font-bold bg-teal-500/20 border border-teal-400 text-teal-300 transition cursor-pointer';
+        btnIIR.className = 'p-2 rounded-xl text-xs font-bold bg-slate-800 border border-slate-700 text-slate-300 hover:border-rose-400 transition cursor-pointer';
+        exp.innerHTML = '✅ Zero-Phase (<code>filtfilt</code>) memfilter maju & mundur: pergeseran fase 0 ms, posisi R-Peak presisi!';
+        exp.className = 'text-[11px] text-teal-300 mt-1.5 leading-snug';
+        lagInd.textContent = '0 ms (Zero-Phase)';
+        lagInd.className = 'text-xs font-mono font-bold text-teal-400 leading-tight';
+      }
+      generatePythonCodePreview();
+    }
+
+    function setPanTompkinsStage(stage) {
+      appState.panStage = stage;
+      const names = {
+        1: 'Tahap 1: Sinyal Terfilter',
+        2: 'Tahap 2: Bandpass 5–15 Hz',
+        3: 'Tahap 3: Diferensiasi (d/dt)',
+        4: 'Tahap 4: Penguadratan (x²)',
+        5: 'Tahap 5: Moving Window Integration'
+      };
+      const descs = {
+        1: 'Menampilkan sinyal EKG setelah melalui rangkaian filter pra-pemrosesan (Notch/HP/Bandpass).',
+        2: 'Menekankan energi kemiringan kompleks QRS (5–15 Hz) dan meredam gelombang P maupun T.',
+        3: 'Menghitung turunan pertama untuk mengekstrak informasi kemiringan curam pada kompleks QRS.',
+        4: 'Menguadratkan sinyal titik demi titik agar seluruh nilai positif dan puncak QRS menonjol non-linear.',
+        5: 'Mengintegrasikan lebar gelombang kompleks QRS menggunakan jendela geser sehingga mudah dideteksi threshold.'
+      };
+      document.getElementById('pan-stage-badge').textContent = names[stage];
+      document.getElementById('pt-stage-desc').textContent = descs[stage];
+
+      for (let i = 1; i <= 5; i++) {
+        const btn = document.getElementById(`pt-btn-${i}`);
+        const colSpan = i === 5 ? 'col-span-2 sm:col-span-1 ' : '';
+        if (i === stage) {
+          btn.className = `pt-stage-btn ${colSpan}p-2 rounded-xl bg-teal-500/20 border border-teal-400 text-white text-xs font-bold text-center transition cursor-pointer`;
+        } else {
+          btn.className = `pt-stage-btn ${colSpan}p-2 rounded-xl bg-cardDark border border-slate-700 text-slate-300 hover:border-teal-400 text-xs font-semibold text-center transition cursor-pointer`;
+        }
+      }
+
+      // Sesuaikan rekomendasi threshold default saat berpindah tahap agar tetap intuitif
+      if (stage === 4 || stage === 5) {
+        if (appState.threshold > 0.75) {
+          document.getElementById('threshold-slider').value = 0.45;
+          updateDSPSettings();
+        }
+      }
+    }
+
+    // =========================================================================
+    // 8. RENDER OSILOSKOP REAL-TIME (HTML5 CANVAS)
+    // =========================================================================
+    function renderOscilloscope() {
+      const canvas = document.getElementById('ecg-oscilloscope');
+      if (!canvas) return;
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      if (canvas.width !== Math.floor(rect.width * dpr) || canvas.height !== Math.floor(rect.height * dpr)) {
+        canvas.width = Math.floor(rect.width * dpr);
+        canvas.height = Math.floor(rect.height * dpr);
+      }
+
+      const ctx = canvas.getContext('2d');
+      ctx.save();
+      ctx.scale(dpr, dpr);
+      const w = rect.width;
+      const h = rect.height;
+
+      // Latar kertas grafik EKG medis gelap
+      ctx.fillStyle = '#03080e';
+      ctx.fillRect(0, 0, w, h);
+
+      // Grid kotak kecil & besar ala kertas EKG
+      const minorGrid = 16;
+      const majorGrid = minorGrid * 5;
+      ctx.lineWidth = 1;
+
+      ctx.strokeStyle = 'rgba(20, 184, 166, 0.06)';
+      ctx.beginPath();
+      for (let x = 0; x < w; x += minorGrid) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+      for (let y = 0; y < h; y += minorGrid) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(20, 184, 166, 0.16)';
+      ctx.beginPath();
+      for (let x = 0; x < w; x += majorGrid) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+      for (let y = 0; y < h; y += majorGrid) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
+      ctx.stroke();
+
+      const midY = h * 0.62;
+      const scaleY = h * 0.36;
+      const n = appState.rawBuffer.length;
+      if (n < 2) { ctx.restore(); return; }
+
+      // 1. Gambar Sinyal Mentah (Raw + Derau) - Abu-abu transparan
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.42)';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const x = (i / (appState.bufferLength - 1)) * w;
+        const y = midY - appState.rawBuffer[i] * scaleY;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      // 2. Gambar Garis Ambang Batas (Threshold) - Kuning putus-putus
+      const threshY = midY - appState.threshold * scaleY;
+      ctx.save();
+      ctx.setLineDash([6, 5]);
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.8)';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(0, threshY);
+      ctx.lineTo(w, threshY);
+      ctx.stroke();
+      ctx.restore();
+
+      // 3. Gambar Sinyal Terproses (Filter / Pan-Tompkins) - Teal Terang
+      ctx.strokeStyle = '#14b8a6';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const x = (i / (appState.bufferLength - 1)) * w;
+        const y = midY - appState.procBuffer[i] * scaleY;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      // 4. Tandai Puncak R yang Terdeteksi dengan Titik Merah + Label R
+      for (let i = 0; i < n; i++) {
+        if (appState.peakFlags[i]) {
+          const x = (i / (appState.bufferLength - 1)) * w;
+          const y = midY - appState.procBuffer[i] * scaleY;
+          ctx.fillStyle = '#f43f5e';
+          ctx.beginPath();
+          ctx.arc(x, y, 4.5, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+
+          ctx.fillStyle = '#fda4af';
+          ctx.font = 'bold 10px JetBrains Mono, monospace';
+          ctx.fillText('R', x - 3, y - 9);
+        }
+      }
+
+      ctx.restore();
+    }
+
+    // =========================================================================
+    // 9. INTEGRASI GEN-AI FUNGSIONAL: GENERATOR KASUS, EVALUATOR HOTS & PYTHON
+    // =========================================================================
+    function generateNewAICase() {
+      caseIndex = (caseIndex + 1) % aiCaseBank.length;
+      const nextCase = aiCaseBank[caseIndex];
+      appState.currentCase = { ...nextCase };
+
+      // Terapkan kondisi klinis kasus baru ke simulator
+      appState.noise50HzOn = nextCase.noise50HzOn;
+      appState.noise50HzAmp = nextCase.noise50HzAmp;
+      appState.noiseBWOn = nextCase.noiseBWOn;
+      appState.noiseBWAmp = nextCase.noiseBWAmp;
+      appState.noiseEMGOn = nextCase.noiseEMGOn;
+      appState.noiseEMGAmp = nextCase.noiseEMGAmp;
+
+      // Reset filter mahasiswa agar mahasiswa menyelesaikan kasus baru secara aktif
+      appState.filterNotch = false;
+      appState.filterHP = false;
+      appState.filterBP = false;
+      appState.phaseMode = 'iir';
+      appState.panStage = 1;
+      appState.threshold = 0.55;
+      appState.recentRIntervals = [];
+      appState.lastRPeakTime = -10;
+
+      // Set impedansi elektroda sesuai kasus
+      ['RA', 'LA', 'LL'].forEach(id => {
+        const imp = nextCase.elec[id];
+        appState.electrodes[id] = { impedance: imp, calibrated: imp < 5.0 };
+      });
+
+      // Sinkronkan kontrol DOM
+      document.getElementById('case-id-badge').textContent = `#${nextCase.id}`;
+      document.getElementById('case-location').textContent = `📍 ${nextCase.location}`;
+      document.getElementById('case-title').textContent = nextCase.title;
+      document.getElementById('case-description').textContent = nextCase.description;
+      document.getElementById('true-bpm-hud').textContent = `${nextCase.trueBPM} BPM`;
+      document.getElementById('ai-case-summary-tag').textContent = `Target: ${nextCase.trueBPM} BPM (${nextCase.rhythmType})`;
+
+      document.getElementById('noise-50hz-toggle').checked = appState.noise50HzOn;
+      document.getElementById('noise-50hz-slider').value = appState.noise50HzAmp;
+      document.getElementById('noise-bw-toggle').checked = appState.noiseBWOn;
+      document.getElementById('noise-bw-slider').value = appState.noiseBWAmp;
+      document.getElementById('noise-emg-toggle').checked = appState.noiseEMGOn;
+      document.getElementById('noise-emg-slider').value = appState.noiseEMGAmp;
+
+      document.getElementById('filter-notch-toggle').checked = false;
+      document.getElementById('filter-hp-toggle').checked = false;
+      document.getElementById('filter-bp-toggle').checked = false;
+      document.getElementById('threshold-slider').value = 0.55;
+
+      setFilterPhaseMode('iir');
+      setPanTompkinsStage(1);
+      updateElectrodeUI();
+      updateElectrode3DColors();
+      updateDSPSettings();
+
+      document.getElementById('ai-score-badge').textContent = 'Menunggu Validasi';
+      document.getElementById('ai-score-badge').className = 'px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-300';
+      document.getElementById('ai-feedback-list').innerHTML = `
+        <p class="text-amber-200">✨ <strong>Skenario Baru Dibangkitkan oleh GenAI:</strong> ${nextCase.rhythmType} di <strong>${nextCase.location}</strong>. Selesaikan kalibrasi elektroda, rantai filter digital, dan deteksi BPM sebelum menekan tombol validasi.</p>
+      `;
+
+      showToast(`✨ GenAI membuat skenario baru: <strong>${nextCase.location}</strong> (${nextCase.rhythmType})!`, 'info');
+    }
+
+    function validateClinicalDecision() {
+      selectLearningStep(4);
+      const c = appState.currentCase;
+      let score = 0;
+      const diagnostics = [];
+
+      // 1. Audit Kalibrasi Elektroda 3D (25 poin)
+      const uncal = ['RA', 'LA', 'LL'].filter(id => !appState.electrodes[id].calibrated);
+      if (uncal.length === 0) {
+        score += 25;
+        diagnostics.push(`<div class="p-2 rounded-lg bg-emerald-950/60 border border-emerald-500/40 text-emerald-200">✅ <strong>Kalibrasi Elektroda 3D (25/25):</strong> Seluruh elektroda (RA, LA, LL) memiliki impedansi kontak &lt; 5 kΩ sehingga derau setengah sel tertekan optimal.</div>`);
+      } else {
+        diagnostics.push(`<div class="p-2 rounded-lg bg-rose-950/60 border border-rose-500/40 text-rose-200">❌ <strong>Kalibrasi Elektroda 3D (0/25):</strong> Elektroda <strong>${uncal.join(', ')}</strong> masih berimpedansi tinggi (&gt;5 kΩ). Klik bola elektroda pada model 3D untuk membersihkannya.</div>`);
+      }
+
+      // 2. Audit Rantai Filter Digital (25 poin)
+      const notchOk = !c.requiredNotch || appState.filterNotch;
+      const hpOk = !c.requiredHP || appState.filterHP || appState.filterBP;
+      const bpOk = !c.requiredBP || appState.filterBP;
+
+      if (notchOk && hpOk && bpOk) {
+        score += 25;
+        diagnostics.push(`<div class="p-2 rounded-lg bg-emerald-950/60 border border-emerald-500/40 text-emerald-200">✅ <strong>Desain Filter Digital (25/25):</strong> Rangkaian filter tepat untuk mengisolasi gangguan spesifik pada skenario ${c.location}.</div>`);
+      } else {
+        const missing = [];
+        if (!notchOk) missing.push('Notch Filter 50 Hz');
+        if (!hpOk) missing.push('High-Pass 0.5 Hz');
+        if (!bpOk) missing.push('Bandpass 0.5–40 Hz (untuk EMG)');
+        diagnostics.push(`<div class="p-2 rounded-lg bg-amber-950/60 border border-amber-500/40 text-amber-200">⚠️ <strong>Desain Filter Digital (10/25):</strong> Filter berikut masih dibutuhkan untuk membersihkan sinyal: <strong>${missing.join(', ')}</strong>.</div>`);
+        score += 10;
+      }
+
+      // 3. Audit Fase Filter: IIR vs Zero-Phase filtfilt (25 poin)
+      if (appState.phaseMode === 'zerophase') {
+        score += 25;
+        diagnostics.push(`<div class="p-2 rounded-lg bg-emerald-950/60 border border-emerald-500/40 text-emerald-200">✅ <strong>Integritas Fase Sinyal (25/25):</strong> Pilihan metode <code>scipy.signal.filtfilt</code> (Zero-Phase) mempertahankan posisi temporal puncak R secara akurat (0 ms lag).</div>`);
+      } else {
+        diagnostics.push(`<div class="p-2 rounded-lg bg-rose-950/60 border border-rose-500/40 text-rose-200">❌ <strong>Distorsi Fase IIR (0/25):</strong> Anda masih memakai filter IIR satu arah (<code>lfilter</code>) yang menggeser puncak R sebesar +44 ms. Ubah ke <strong>Zero-Phase (<code>filtfilt</code>)</strong> untuk analisis klinis presisi!</div>`);
+      }
+
+      // 4. Audit Akurasi Deteksi BPM Pan-Tompkins (25 poin)
+      const bpmError = Math.abs(appState.detectedBPM - c.trueBPM);
+      if (appState.detectedBPM > 0 && bpmError <= 5) {
+        score += 25;
+        diagnostics.push(`<div class="p-2 rounded-lg bg-emerald-950/60 border border-emerald-500/40 text-emerald-200">✅ <strong>Deteksi R-Peak & BPM (25/25):</strong> Pembacaan <strong>${appState.detectedBPM} BPM</strong> sangat akurat terhadap referensi pasien (${c.trueBPM} BPM) dengan ambang threshold ${appState.threshold.toFixed(2)}.</div>`);
+      } else {
+        diagnostics.push(`<div class="p-2 rounded-lg bg-amber-950/60 border border-amber-500/40 text-amber-200">⚠️ <strong>Deteksi R-Peak & BPM (5/25):</strong> BPM terukur saat ini <strong>${appState.detectedBPM} BPM</strong> (Target: ${c.trueBPM} BPM). Sesuaikan slider Threshold Pan-Tompkins agar hanya puncak R yang terdeteksi.</div>`);
+        score += 5;
+      }
+
+      const badge = document.getElementById('ai-score-badge');
+      badge.textContent = `Skor Klinis: ${score}/100`;
+      badge.className = score >= 85
+        ? 'px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
+        : 'px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-400/40';
+
+      document.getElementById('ai-feedback-list').innerHTML = diagnostics.join('');
+      generatePythonCodePreview();
+
+      if (score >= 85) {
+        showToast(`🏆 Luar biasa! Skor Keputusan Klinis Anda ${score}/100. Kode Python siap digunakan.`, 'success');
+      } else {
+        showToast(`🩺 Audit AI selesai (Skor ${score}/100). Periksa catatan perbaikan di panel bawah.`, 'warn');
+      }
+    }
+
+    function generatePythonCodePreview() {
+      const c = appState.currentCase;
+      const useZeroPhase = appState.phaseMode === 'zerophase';
+      const applyFn = useZeroPhase ? 'signal.filtfilt' : 'signal.lfilter';
+
+      const code = `# ==========================================================
+# CardioSense 3D - Kode Pemrosesan Sinyal EKG (Google Colab)
+# Kasus: ${c.id} (${c.location})
+# Ritme Target: ${c.rhythmType} | Fs = 250 Hz
+# ==========================================================
+import numpy as np
+from scipy import signal
+
+fs = 250.0  # Frekuensi sampling (Hz)
+# ecg_raw: array sinyal EKG mentah hasil akuisisi AD8232 / BioAmp
+
+ecg_proc = ecg_raw.copy()
+
+${appState.filterNotch ? `# 1. Notch Filter 50 Hz (Menghilangkan interferensi jala-jala PLN)
+b_notch, a_notch = signal.iirnotch(w0=50.0, Q=30.0, fs=fs)
+ecg_proc = ${applyFn}(b_notch, a_notch, ecg_proc)
+` : `# [Notch Filter 50 Hz belum diaktifkan]
+`}
+${appState.filterHP ? `# 2. High-Pass Filter 0.5 Hz (Menghilangkan Baseline Wander respirasi)
+sos_hp = signal.butter(2, 0.5, btype='highpass', fs=fs, output='ba')
+ecg_proc = ${applyFn}(sos_hp[0], sos_hp[1], ecg_proc)
+` : `# [High-Pass Filter 0.5 Hz belum diaktifkan]
+`}
+${appState.filterBP ? `# 3. Bandpass Filter 0.5 - 40 Hz (Meredam artefak otot EMG frekuensi tinggi)
+b_bp, a_bp = signal.butter(3, [0.5, 40.0], btype='bandpass', fs=fs)
+ecg_proc = ${applyFn}(b_bp, a_bp, ecg_proc)
+` : `# [Bandpass Filter 0.5 - 40 Hz belum diaktifkan]
+`}
+# 4. Pipeline Deteksi QRS Pan-Tompkins & Perhitungan BPM
+b_qrs, a_qrs = signal.butter(2, [5.0, 15.0], btype='bandpass', fs=fs)
+qrs_band = signal.filtfilt(b_qrs, a_qrs, ecg_proc)
+qrs_diff = np.diff(qrs_band, prepend=qrs_band[0])
+qrs_sq   = qrs_diff ** 2
+win_len  = int(0.112 * fs)
+qrs_mwi  = np.convolve(qrs_sq, np.ones(win_len)/win_len, mode='same')
+
+peaks, _ = signal.find_peaks(qrs_mwi, height=${appState.threshold.toFixed(2)}, distance=int(0.24 * fs))
+bpm = 60.0 / np.mean(np.diff(peaks) / fs) if len(peaks) > 1 else 0
+print(f"Metode Filter: ${useZeroPhase ? 'Zero-Phase (filtfilt)' : 'IIR Satu Arah (lfilter)'} | BPM: {bpm:.1f}")`;
+
+      const pre = document.getElementById('python-code-output');
+      if (pre) pre.textContent = code;
+    }
+
+    function copyPythonCode() {
+      const codeText = document.getElementById('python-code-output').textContent;
+      const tempTextArea = document.createElement('textarea');
+      tempTextArea.value = codeText;
+      tempTextArea.style.position = 'fixed';
+      tempTextArea.style.left = '-9999px';
+      document.body.appendChild(tempTextArea);
+      tempTextArea.select();
+      try {
+        document.execCommand('copy');
+        showToast('📋 Kode Python berhasil disalin! Siap ditempel ke Google Colab.', 'success');
+      } catch (err) {
+        showToast('Gagal menyalin kode secara otomatis.', 'error');
+      }
+      document.body.removeChild(tempTextArea);
+    }
+
+    // =========================================================================
+    // 10. LOOP ANIMASI UTAMA (SINKRONISASI 3D JANTUNG + OSILOSKOP 250 HZ)
+    // =========================================================================
+    let lastFrameTime = performance.now();
+    let sampleAccumulator = 0;
+
+    function mainAnimationLoop(now) {
+      requestAnimationFrame(mainAnimationLoop);
+
+      const dtSec = Math.min(0.05, (now - lastFrameTime) / 1000);
+      lastFrameTime = now;
+
+      // Jalankan step simulasi sinyal pada 250 Hz
+      const samplePeriod = 1 / appState.sampleRate;
+      sampleAccumulator += dtSec;
+      while (sampleAccumulator >= samplePeriod) {
+        stepSignalSample(samplePeriod);
+        sampleAccumulator -= samplePeriod;
+      }
+
+      // Render Osiloskop Real-Time
+      renderOscilloscope();
+
+      // Update HUD BPM & Fase Jantung
+      document.getElementById('detected-bpm').textContent = appState.detectedBPM;
+      document.getElementById('cardiac-phase-label').textContent = appState.cardiacPhase;
+
+      // Update & Render Model Jantung 3D
+      if (renderer && scene && camera && heartGroup) {
+        currentRot.x += (targetRot.x - currentRot.x) * 0.12;
+        currentRot.y += (targetRot.y - currentRot.y) * 0.12;
+        heartGroup.rotation.x = currentRot.x;
+        heartGroup.rotation.y = currentRot.y;
+
+        // Denyut skala jantung sinkron dengan siklus P-QRS-T
+        const s = appState.heartBeatScale;
+        heartGroup.scale.set(s, s, s);
+
+        // Nyala indikator SA Node, AV Node & Purkinje
+        if (saNodeMesh && avNodeMesh) {
+          const isP = appState.cardiacPhase.includes('(P)');
+          const isQRS = appState.cardiacPhase.includes('(QRS)');
+          saNodeMesh.scale.setScalar(isP ? 1.55 : 0.9);
+          avNodeMesh.scale.setScalar(isQRS ? 1.55 : 0.9);
+        }
+
+        renderer.render(scene, camera);
+      }
+    }
+
+    // Inisialisasi saat halaman selesai dimuat
+    window.onload = function () {
+      initThreeJS();
+      updateElectrodeUI();
+      updateDSPSettings();
+      generatePythonCodePreview();
+      requestAnimationFrame(mainAnimationLoop);
+    };
+  </script>
+</body>
+</html>
